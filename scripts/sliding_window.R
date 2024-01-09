@@ -131,13 +131,20 @@ save(cpg_windows, file = "data/processed/cpg_meth_per_window_per_region.RData")
 
 
 #### plotting
+total_window <- data.frame(region = c(rep("upstream", times = 41),
+                                      rep("TSS", times = 1),
+                                      rep("genes", times = 41),
+                                      rep("downstream", times = 41)),
+                           win_nr = c(c(1:41), 1, c(1:41), c(1:41)),
+                           window_total = c(1:124))
 #extract for one gene
 cpg_test <- subset(cpg_windows, gene_id == "ANN00003" | gene_id == "ANN00004")
 
 cpg_test$region <- factor(cpg_test$region, levels = c("upstream", "TSS", "genes", "downstream"))
 cpg_test$win_nr <- as.numeric(cpg_test$win_nr)
 cpg_test$methperc_mean <- as.numeric(cpg_test$methperc_mean)
-cpg_test <- cpg_test %>% group_by(gene_id) %>% arrange(region, win_nr) %>% mutate(window_total = row_number())
+cpg_test <- left_join(cpg_test, total_window, by = c("win_nr", "region"))
+
 #problem when gene is too short and don't have 41 windows
 
 cpg_test_n <- cpg_test %>% group_by(window_total) %>% 
@@ -155,16 +162,21 @@ cpg_test_sum$se_meth <- cpg_test_sum$sd_meth/sqrt(cpg_test_sum$n_meth)
 cpg_test_sum[cpg_test_sum == "NaN"] <- NA
 
 # real data
+
 cpg_windows$region <- factor(cpg_windows$region, levels = c("upstream", "TSS", "genes", "downstream"))
 cpg_windows$win_nr <- as.numeric(cpg_windows$win_nr)
 cpg_windows$methperc_mean <- as.numeric(cpg_windows$methperc_mean)
-cpg_windows <- cpg_windows %>% group_by(gene_id) %>% arrange(region, win_nr) %>% mutate(window_total = row_number())
+cpg_windows <- left_join(cpg_windows, total_window, by = c("win_nr", "region"))
+cpg_windows <- subset(cpg_windows, !is.na(window_total))
+#problem when gene is too short and don't have 41 windows
 
 cpg_windows_n <- cpg_windows %>% group_by(window_total) %>% 
   summarise(n_meth = sum(!is.na(methperc_mean)))
 
 cpg_windows_mean <- cpg_windows %>% group_by(window_total) %>% 
-  summarise(mean_meth = mean(methperc_mean, na.rm=T))
+  summarise(mean_meth = mean(methperc_mean, na.rm=TRUE),
+            min_meth = min(methperc_mean, na.rm=TRUE),
+            max_meth = max(methperc_mean, na.rm=TRUE))
 
 cpg_windows_sd <- cpg_windows %>% group_by(window_total) %>% 
   summarise(sd_meth = sd(methperc_mean, na.rm=T))
@@ -173,6 +185,7 @@ cpg_windows_sum <- left_join(cpg_windows_n, cpg_windows_mean, by = "window_total
 cpg_windows_sum <- left_join(cpg_windows_sum, cpg_windows_sd, by = "window_total")
 cpg_windows_sum$se_meth <- cpg_windows_sum$sd_meth/sqrt(cpg_windows_sum$n_meth)
 cpg_windows_sum[cpg_windows_sum == "NaN"] <- NA
+
 
 # plot 
 # colours
@@ -188,16 +201,24 @@ theme_set(theme_classic() + theme(title = element_text(size=16),
                                   axis.title.y = element_text(margin = margin(t = 0, r = 10, b = 0, l = 0),
                                                               color = "black"),
                                   plot.margin = margin(1,1,1,1, "cm")))
-                                  
+
+mean_tss_meth <- mean(cpg_windows$methperc_mean[which(cpg_windows$region == "TSS")], na.rm=T)      
+
 ggplot(cpg_windows_sum, aes(x = window_total, y = mean_meth)) + 
-  geom_line(col = "black") +
-  geom_ribbon(aes(ymin = mean_meth - se_meth, ymax =mean_meth + se_meth), fill = "lightblue", alpha = 0.8)+
+  geom_ribbon(aes(ymin = mean_meth - se_meth, ymax =mean_meth + se_meth), fill = "lightblue", alpha = 0.7)+
+  geom_line(col = "black", linewidth = 0.8) +
   geom_point() + labs(y = "Mean CpG methylation %", title = "CpG methylation across gene regions")+
+  geom_text(label="10 kb upstream", x = 20, y = 65, col = clr_4[1], family = "Arial", size = 6)+
+  geom_text(label="Gene body", x = 62, y = 65, col = clr_4[3], family = "Arial", size = 6)+
+  geom_text(label="10 kb downstream", x = 104, y = 65, col = clr_4[4], family = "Arial", size = 6)+
+  geom_text(label="TSS", x = 51, y = mean_tss_meth, col = clr_4[2], family = "Arial", size = 6)+ 
+  geom_segment(aes(xend = 43, y = mean_tss_meth, x = 47, yend = mean_tss_meth), arrow = arrow(length = unit(0.2, "cm")))+
   geom_vline(xintercept = 41.5, linetype = "dotted", col = clr_4[1])+ 
   geom_vline(xintercept = 42.5, linetype = "dotted", col = clr_4[2])+ 
   geom_vline(xintercept = 41.5, linetype = "dotted", col = clr_4[3])+ 
   geom_vline(xintercept = 83.5, linetype = "dotted", col = clr_4[4])+ 
   scale_color_manual(values=clr_4)+
+  ylim(55, 67)+
   theme(axis.title.x = element_blank(),
         axis.text.x = element_blank(),
         legend.position = "bottom") -> across_genes
@@ -214,8 +235,8 @@ ggplot(tss, aes(x = methperc_n, y = methperc_mean)) + geom_point() +
   geom_smooth(method="lm")-> tss_n_vs_meth
 
 cowplot::plot_grid(tss_hist, tss_n_vs_meth, ncol = 2, align = "hv", axis = "bl") -> tss_a
-cowplot::plot_grid(tss_a, across_genes, ncol = 1, align = "hv", axis = "bl") -> tss_sum
+cowplot::plot_grid(tss_a, across_genes, ncol = 1, align = "h", axis = "l") -> tss_sum
 
-ggsave(tss_sum, file = "plots/summary_wgbs_TSS.png", width=12, height=12)
+ggsave(tss_sum, file = "plots/summary_wgbs_TSS.png", width=16, height=16)
 
 
