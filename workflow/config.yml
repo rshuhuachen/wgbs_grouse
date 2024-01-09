@@ -1,0 +1,22 @@
+# path to output directory
+output_dir: "/vol/cluster-data/rchen/wgbs/data/processed"
+
+# input directory where raw reads are
+input_dir: "/vol/cluster-data/rchen/wgbs/data"
+
+#tmp directory
+tmpdir: "/vol/cluster-data/rchen/tmp"
+
+R1: "E197_R1"
+R2: "E197_R2"
+
+# genome name (leaave it blank in denovo mode)
+genome_dir: "/vol/cluster-data/rchen/wgbs/data/"
+genome: "lyrurus_tetrix.fa.gz"
+
+# singularity container locations
+fastp: "/vol/cluster-data/rchen/epi/epigbs2/singularity/fastp_0.23.2--h5f740d0_3.sif"
+fastqc: "/vol/cluster-data/rchen/epi/epigbs2/singularity/fastqc_0.11.9--hdfd78af_1.sif"
+bismark: "/vol/cluster-data/rchen/epi/epigbs2/singularity/bismark_0_24.sif"
+
+

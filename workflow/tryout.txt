@@ -1,0 +1,4 @@
+## steps required:
+# read quality control, tripgalore and fastqc to remove adaptor sequences
+# read mapping to ref genome, bismark and bs seeker
+# methylation calling, bismark and bicycle

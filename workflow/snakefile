@@ -1,0 +1,80 @@
+'''
+snakemake -n \
+  --jobs 8 \
+  -p \
+  --use-singularity \
+  --singularity-args '--bind $(pwd),$(pwd)/data/,/vol/cluster-data/rchen/epi/epigbs2/singularity/' \
+  --default-resources mem_mb=200 \
+  --configfile workflow/config.yml \
+  --cluster "
+     sbatch \
+     --account=fair_share \
+     --mem=14000 \
+     --job-name=wgbs \
+     --nodes=10  \
+     --out=slurm.out
+     --err=slurm.err"
+
+'''
+
+rule fastqc:
+    input:
+        R1=expand("{path}/{sample}.fq.gz", path=config["input_dir"], sample=config["R1"]),
+        R2=expand("{path}/{sample}.fq.gz", path=config["input_dir"], sample=config["R2"])
+    output:
+        report=expand("{path}/fastqc/E197_R{read}_fastqc.html", path=config["output_dir"], read=[1,2])
+    singularity:
+        config["fastqc"]
+    params:
+        q="--quiet",
+        dir=expand("{path}/fastqc/", path=config["output_dir"])
+    threads: 2
+    shell: 
+        "mkdir -p {params.dir} && fastqc -t {threads} {params.q} --outdir {params.dir} {input.R1} {input.R2}"
+
+rule trimgalore:
+    input:
+        R1=expand("{path}/{sample}.fq.gz", path=config["input_dir"], sample=config["R1"]),
+        R2=expand("{path}/{sample}.fq.gz", path=config["input_dir"], sample=config["R2"])
+    output:
+        R1trimmed=expand("{path}/trimmed/{sample}_trimmed.fq.gz", path=config["output_dir"], sample=config["R1"]),
+        R2trimmed=expand("{path}/trimmed/{sample}_trimmed.fq.gz", path=config["output_dir"], sample=config["R2"])
+    log:
+        log=expand("log/cutadapt_adapter.log")
+    conda:
+        "env/wgbs.yaml"
+    params:
+        dir=expand("{path}/trimmed", path=config["output_dir"])
+    threads: 4
+    shell:
+        "mkdir -p {params.dir} && trim_galore --paired {input.R1} {input.R2} --quality 15 --fastqc --illumina --stringency 2 --gzip --length 20 --trim-n --cores {threads} -o {params.dir} 2>&1 | tee {log}"
+
+rule prep_reference:
+    input:
+        reference=expand("{path}/{genome}", path=config["genome_dir"],genome=config["genome"])
+    output:
+        convReference=expand("{path}/converted_genome/genome_mfa.CT_conversion.fa",path=config["genome_dir"])
+    params:
+        refDir=config["genome_dir"]
+    singularity:
+        config["bismark"]
+    shell:
+         "bismark_genome_preparation {params.refDir}"
+
+rule alignment:
+    input:
+        R1trimmed=expand("{path}/trimmed/{sample}_trimmed.fq.gz", path=config["output_dir"], sample=config["R1"]),
+        R2trimmed=expand("{path}/trimmed/{sample}_trimmed.fq.gz", path=config["output_dir"], sample=config["R2"]),
+        maskedReference=expand("{path}/converted_genome/genome_mfa.CT_conversion.fa",path=config["genome_dir"])
+    output:
+        alignment=expand("{out}/alignment/{{sample}}_trimmed_filt_merged.1_bismark_bt2_pe.bam",out=config["output_dir"])
+    params:
+        out=expand("{path}",path=config["output_dir"]),
+        sample="{sample}",
+        refDir=expand("{path}/converted_genome",path=config["genome_dir"])
+    singularity:
+        config["bismark"]
+    threads: 8
+    shell:
+        "bismark -p {threads} --parallel 4 --un --ambiguous --genome {params.refDir} -1 {input.R1trimmed} -2 {input.R2trimmed} -o {params.out}/alignment/ --rg_tag --rg_id {params.sample} --rg_sample {params.sample}"
+
