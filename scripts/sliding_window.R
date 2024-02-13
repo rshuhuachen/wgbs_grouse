@@ -4,17 +4,17 @@
 pacman::p_load(data.table, genomation, GenomicFeatures, rtracklayer, GenomicRanges, windowscanr, dplyr, ggplot2, cowplot, assertthat)
 
 #### load data ####
-#meth <- fread("data/processed/methcall/methcall_report.CX_report.txt.gz")
+meth <- fread("data/processed/methcall/methcall_report.CX_report.txt.gz")
 
-#meth$V1 <- gsub(";", "__", meth$V1)
-#meth$V1 <- gsub("=", "_", meth$V1)
+meth$V1 <- gsub(";", "__", meth$V1)
+meth$V1 <- gsub("=", "_", meth$V1)
 
-#names(meth) <- c("chr", "start", "strand", "nC", "nT", "dicontext", "tricontext")
-#meth$end <- meth$start
+names(meth) <- c("chr", "start", "strand", "nC", "nT", "dicontext", "tricontext")
+meth$end <- meth$start
 
-#cpg <- subset(meth, dicontext == "CG")
-#ch <- subset(meth, dicontext != "CG")
-#rm(meth)
+cpg <- subset(meth, dicontext == "CG")
+ch <- subset(meth, dicontext != "CG")
+rm(meth)
 
 ##### Annotation ####
 ### function to annotate dataframe
@@ -32,6 +32,7 @@ annotate_methfile <- function(long_df, annotation_dir, regions){
   for (i in regions){
     #load in gff file
     region <- unique(gffToGRanges(paste0(annotation_dir, i, ".gff3")))
+    region <- as(region, "GRanges")
     #find overlaps in df and gene region, because can have multiple hits include all
     hits <- findOverlaps(df_gr, region)
     idx_c <- queryHits(hits)
@@ -57,21 +58,21 @@ annotate_methfile <- function(long_df, annotation_dir, regions){
 }
 
 ## Annotate CpG and CH file
-#cpg_annotate <- annotate_methfile(long_df = cpg, 
-#                                  annotation_dir = "/vol/cluster-data/rchen/git/grouse-annotation/output/", 
-#                                  regions = c("TSS", "genes", "upstream", "downstream"))
+cpg_annotate <- annotate_methfile(long_df = cpg,
+                                 annotation_dir = "/vol/cluster-data/rchen/git/grouse-annotation/output/",
+                                 regions = c("TSS", "genes", "upstream", "downstream"))
 
 #ch_annotate <- annotate_methfile(long_df = ch, 
 #                                  annotation_dir = "/vol/cluster-data/rchen/git/grouse-annotation/output/", 
 #                                  regions = c("TSS", "genes", "upstream", "downstream"))
 
-#cpg_annotate$methperc <- cpg_annotate$nC / (cpg_annotate$nC + cpg_annotate$nT) * 100
+cpg_annotate$methperc <- cpg_annotate$nC / (cpg_annotate$nC + cpg_annotate$nT) * 100
 
-#save(cpg_annotate, file = "data/processed/annotated_cpg.RData")
+save(cpg_annotate, file = "data/processed/annotated_cpg.RData")
 #save(ch_annotate, file = "data/processed/annotated_chh.RData")
 #### Per gene, calculate meth% per bin
-#cpg_annotate <- cpg_annotate[,c(1:5,7:9,11)]
-#cpg_list <- cpg_annotate %>% group_split(gene_id, region)
+#skip --cpg_annotate <- cpg_annotate[,c(1:5,7:9,11)] #what are we selecting?
+cpg_list <- cpg_annotate %>% group_split(gene_id, region)
 
 #save(cpg_list, file = "data/processed/annotated_cpg_list.RData")
 #load(file = "data/processed/annotated_cpg_list.RData")
@@ -124,10 +125,10 @@ meth_per_window <- function(gene_region){tryCatch({
   return(sum_window)
   }, error = function(e){cat("ERROR :", conditionMessage(e), "\n");print(paste0(gene_region$chr[1], "_", gene_region$pos[1]))})}
 
-#cpg_windows <- parallel::mclapply(cpg_list, meth_per_window, mc.cores=12)
-#cpg_windows <- do.call(rbind.data.frame, cpg_windows)
+cpg_windows <- parallel::mclapply(cpg_list, meth_per_window, mc.cores=12)
+cpg_windows <- do.call(rbind.data.frame, cpg_windows)
 
-#save(cpg_windows, file = "data/processed/cpg_meth_per_window_per_region.RData")
+save(cpg_windows, file = "data/processed/cpg_meth_per_window_per_region.RData")
 load(file = "data/processed/cpg_meth_per_window_per_region.RData")
 
 #### plotting
@@ -275,12 +276,14 @@ tss_min3 <- subset(cpg_windows_min3, region == "TSS")
 tss_min3$methperc_n <- as.numeric(tss_min3$methperc_n)
 
 ggplot(tss_min3, aes(x = methperc_mean)) + geom_histogram() +
-  labs(x = "Mean CpG methylation %", title = "Histogram TSS CpG methylation %" , subtitle = "(min sites = 3)", y = "Count") -> tss_hist_min3
+  labs(x = "Mean CpG methylation %", title = "Histogram TSS CpG methylation %" , subtitle = "(min sites = 3)", y = "Count")-> tss_hist_min3
 
 ggplot(tss_min3, aes(x = methperc_n, y = methperc_mean)) + geom_point() +
   labs(x = "Number of CpGs", title = "#CpG sites vs mean methylation in TSS", subtitle = "(min sites = 3)",y = "Mean CpG methylation %") +
   ylim(0, 100)+
   geom_smooth(method="lm")-> tss_n_vs_meth_min3
+
+mean_tss_meth <- mean(cpg_windows_min3$methperc_mean[which(cpg_windows_min3$region == "TSS")], na.rm=T)      
 
 ggplot(cpg_windows_min3_sum, aes(x = window_total, y = mean_meth)) + 
   geom_ribbon(aes(ymin = mean_meth - se_meth, ymax =mean_meth + se_meth), fill = "lightblue", alpha = 0.7)+
