@@ -308,3 +308,9 @@ cowplot::plot_grid(tss_hist_min3, tss_n_vs_meth_min3, ncol = 2, align = "hv", ax
 cowplot::plot_grid(tss_a_min3, across_genes_min3, ncol = 1, align = "h", axis = "l") -> tss_sum_min3
 
 ggsave(tss_sum_min3, file = "plots/summary_wgbs_TSS_min3.png", width=16, height=16)
+
+#without coverage
+
+cowplot::plot_grid(tss_hist_min3, across_genes_min3, ncol = 1, align = "h", axis = "l") -> tss_sum_min3_v2
+
+ggsave(tss_sum_min3_v2, file = "plots/summary_wgbs_TSS_min3_v2.png", width=16, height=16)
