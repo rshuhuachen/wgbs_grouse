@@ -313,4 +313,4 @@ ggsave(tss_sum_min3, file = "plots/summary_wgbs_TSS_min3.png", width=16, height=
 
 cowplot::plot_grid(tss_hist_min3, across_genes_min3, ncol = 1, align = "h", axis = "l") -> tss_sum_min3_v2
 
-ggsave(tss_sum_min3_v2, file = "plots/summary_wgbs_TSS_min3_v2.png", width=16, height=16)
+ggsave(tss_sum_min3_v2, file = "plots/summary_wgbs_TSS_min3_v2.png", width=10, height=10)
