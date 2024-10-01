@@ -14,28 +14,25 @@ clr_4 <- c(clrs[1], clrs[2], clrs[8], clrs[13])
 
 # mean TSS methylation (for y value label)
 
-mean_tss_meth <- mean(cpg_windows_min2$methperc_mean[which(cpg_windows_min2$region == "TSS")], na.rm=T)      
+mean_tss_meth <- 55.78053 # mean(cpg_windows_min2$methperc_mean[which(cpg_windows_min2$region == "TSS")], na.rm=T)      
 
 ggplot(cpg_windows_min2_sum, aes(x = window_total, y = mean_meth)) + 
-  geom_ribbon(aes(ymin = mean_meth - se_meth, ymax =mean_meth + se_meth), fill = clrs[3], alpha = 0.7)+
+  geom_ribbon(aes(ymin = mean_meth - se_meth, ymax =mean_meth + se_meth), fill = clr_high, alpha = 0.6)+
   geom_line(col = "black", linewidth = 0.8) +
-  geom_point() + labs(y = "Mean CpG methylation %", title = "CpG methylation across gene regions")+
-  annotate("text", label="10 kb upstream", x = 20, y = 66, col = clr_4[1], size = 6)+
-  annotate("text", label="Gene body", x = 62, y = 66, col = clr_4[3], size = 6)+
-  annotate("text", label="10 kb downstream", x = 104, y = 66, col = clr_4[4], size = 6)+
-  annotate("text", label="TSS", x = 51, y = mean_tss_meth, col = clr_4[2], size = 6)+ 
+  geom_point(size=3) + labs(y = "Mean CpG methylation %")+
+  annotate("text", label="10 kb upstream", x = 20, y = 66, col = clr_high, size = 6)+
+  annotate("text", label="Gene body", x = 62, y = 66, col = clr_high, size = 6)+
+  annotate("text", label="10 kb downstream", x = 104, y = 66, col = clr_high, size = 6)+
+  annotate("text", label="TSS", x = 51, y = mean_tss_meth, col = clr_gerp, size = 6)+ 
   geom_segment(aes(xend = 43, y = mean_tss_meth, x = 47, yend = mean_tss_meth), arrow = arrow(length = unit(0.2, "cm")))+
-  geom_vline(xintercept = 41.5, linetype = "dotted", col = clr_4[1])+ 
-  geom_vline(xintercept = 42.5, linetype = "dotted", col = clr_4[2])+ 
-  geom_vline(xintercept = 41.5, linetype = "dotted", col = clr_4[3])+ 
-  geom_vline(xintercept = 83.5, linetype = "dotted", col = clr_4[4])+ 
-  scale_color_manual(values=clr_4)+
-  ylim(55, 67)+
+  geom_vline(xintercept = c(41.5, 42.5, 83.5), linetype = "dotted", col = "darkred", linewidth=1)+ 
   theme(axis.title.x = element_blank(),
         axis.text.x = element_blank(),
-        legend.position = "bottom") -> across_genes_min2
+        legend.position = "bottom") -> fig_window
 
-ggsave(across_genes_min2, file = "plots/test.png", width=12, height=12)
+ggsave(fig_window, file = "plots/test.png", width=12, height=8)
+
+# fig mean TSS methylation
 
 tss_min2 <- subset(cpg_windows_min2, region == "TSS")
 tss_min2$methperc_n <- as.numeric(tss_min2$methperc_n)
