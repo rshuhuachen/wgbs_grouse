@@ -73,12 +73,28 @@ cpg_annotate$methperc <- cpg_annotate$nC / (cpg_annotate$nC + cpg_annotate$nT) *
 
 save(cpg_annotate, file = "data/processed/annotated_cpg.RData")
 #save(ch_annotate, file = "data/processed/annotated_chh.RData")
+
 #### Per gene, calculate meth% per bin
 #skip --cpg_annotate <- cpg_annotate[,c(1:5,7:9,11)] #what are we selecting?
-cpg_list <- cpg_annotate %>% group_split(gene_id, region)
 
-#save(cpg_list, file = "data/processed/annotated_cpg_list.RData")
-#load(file = "data/processed/annotated_cpg_list.RData")
+## only include genes of at least 100 bp in length
+# calculate gene length
+genes <- subset(cpg_annotate, region == "genes")%>% select(c(chr,start,end,gene_id)) %>% unique()#n=30651
+
+genes$length <- genes$end - genes$start
+
+summary(genes$length) #min = 69, max = 489kb, mean = 11kb
+
+#if we were to follow laine et al exactly, they calculate an overlap of gene bins with 250bp. assuming the same proportion overlap to length as overlap (250:125=2:1), we would then need 250*2*40 bins = 
+#genes of at least 20kb in length, which would mean excluding 84% of genes. not doing that!
+
+cpg_annotate <- left_join(cpg_annotate, genes[,c("gene_id", "length")], by = "gene_id")
+cpg_annotate_filter <- subset(cpg_annotate, length > 1000) #exclude 6.6%
+cpg_annotate_filter$length <- NULL
+cpg_list <- cpg_annotate_filter %>% group_split(gene_id, region)
+
+#save(cpg_list, file = "data/processed/annotated_cpg_list_min1k.RData")
+#load(file = "data/processed/annotated_cpg_list_min1k.RData")
 meth_per_window <- function(gene_region){tryCatch({
   #determine start and end of each region
  
@@ -92,7 +108,7 @@ meth_per_window <- function(gene_region){tryCatch({
     start_region <- gene_region$start[1]
     end_region <- gene_region$end[1]
     length = floor((end_region - start_region) / 40)
-    overlap = 0.125*length #maybe change this to 0.5 * length?
+    overlap = floor(0.5*length) #maybe change this to 0.5 * length?
     } else if (gene_region$region[1] == "downstream"){
     start_region <- gene_region$start[1]
     end_region <- gene_region$end[1]
@@ -131,8 +147,8 @@ meth_per_window <- function(gene_region){tryCatch({
 cpg_windows <- parallel::mclapply(cpg_list, meth_per_window, mc.cores=12)
 cpg_windows <- do.call(rbind.data.frame, cpg_windows)
 
-save(cpg_windows, file = "data/processed/cpg_meth_per_window_per_region.RData")
-load(file = "data/processed/cpg_meth_per_window_per_region.RData")
+save(cpg_windows, file = "data/processed/cpg_meth_per_window_per_region_min1k.RData")
+load(file = "data/processed/cpg_meth_per_window_per_region_min1k.RData")
 
 #### plotting
 total_window <- data.frame(region = c(rep("upstream", times = 41),
@@ -149,7 +165,7 @@ cpg_test$win_nr <- as.numeric(cpg_test$win_nr)
 cpg_test$methperc_mean <- as.numeric(cpg_test$methperc_mean)
 cpg_test <- left_join(cpg_test, total_window, by = c("win_nr", "region"))
 
-#problem when gene is too short and don't have 41 windows
+#summarise
 
 cpg_test_n <- cpg_test %>% group_by(window_total) %>% 
   summarise(n_meth = sum(!is.na(methperc_mean)))
@@ -175,7 +191,7 @@ cpg_windows_min2$win_nr <- as.numeric(cpg_windows_min2$win_nr)
 cpg_windows_min2$methperc_mean <- as.numeric(cpg_windows_min2$methperc_mean)
 cpg_windows_min2 <- left_join(cpg_windows_min2, total_window, by = c("win_nr", "region"))
 cpg_windows_min2 <- subset(cpg_windows_min2, !is.na(window_total))
-#problem when gene is too short and don't have 41 windows
+#summarise
 
 cpg_windows_min2_n <- cpg_windows_min2 %>% group_by(window_total) %>% 
   summarise(n_meth = sum(!is.na(methperc_mean)))
@@ -193,31 +209,32 @@ cpg_windows_min2_sum <- left_join(cpg_windows_min2_sum, cpg_windows_min2_sd, by 
 cpg_windows_min2_sum$se_meth <- cpg_windows_min2_sum$sd_meth/sqrt(cpg_windows_min2_sum$n_meth)
 cpg_windows_min2_sum[cpg_windows_min2_sum == "NaN"] <- NA
 
+write.csv(cpg_windows_min2_sum, file = "output/summary_cpg_meth_min2.csv", quote=F, row.names=F)
 ## min 3
-cpg_windows_min3 <- subset(cpg_windows, methperc_n > 2)
+#cpg_windows_min3 <- subset(cpg_windows, methperc_n > 2)
 
-cpg_windows_min3$region <- factor(cpg_windows_min3$region, levels = c("upstream", "TSS", "genes", "downstream"))
-cpg_windows_min3$win_nr <- as.numeric(cpg_windows_min3$win_nr)
-cpg_windows_min3$methperc_mean <- as.numeric(cpg_windows_min3$methperc_mean)
-cpg_windows_min3 <- left_join(cpg_windows_min3, total_window, by = c("win_nr", "region"))
-cpg_windows_min3 <- subset(cpg_windows_min3, !is.na(window_total))
-#problem when gene is too short and don't have 41 windows
+#cpg_windows_min3$region <- factor(cpg_windows_min3$region, levels = c("upstream", "TSS", "genes", "downstream"))
+#cpg_windows_min3$win_nr <- as.numeric(cpg_windows_min3$win_nr)
+#cpg_windows_min3$methperc_mean <- as.numeric(cpg_windows_min3$methperc_mean)
+#cpg_windows_min3 <- left_join(cpg_windows_min3, total_window, by = c("win_nr", "region"))
+#cpg_windows_min3 <- subset(cpg_windows_min3, !is.na(window_total))
+#summarise
 
-cpg_windows_min3_n <- cpg_windows_min3 %>% group_by(window_total) %>% 
-  summarise(n_meth = sum(!is.na(methperc_mean)))
+#cpg_windows_min3_n <- cpg_windows_min3 %>% group_by(window_total) %>% 
+#  summarise(n_meth = sum(!is.na(methperc_mean)))
 
-cpg_windows_min3_mean <- cpg_windows_min3 %>% group_by(window_total) %>% 
-  summarise(mean_meth = mean(methperc_mean, na.rm=TRUE),
-            min_meth = min(methperc_mean, na.rm=TRUE),
-            max_meth = max(methperc_mean, na.rm=TRUE))
+#cpg_windows_min3_mean <- cpg_windows_min3 %>% group_by(window_total) %>% 
+#  summarise(mean_meth = mean(methperc_mean, na.rm=TRUE),
+#            min_meth = min(methperc_mean, na.rm=TRUE),
+#            max_meth = max(methperc_mean, na.rm=TRUE))
 
-cpg_windows_min3_sd <- cpg_windows_min3 %>% group_by(window_total) %>% 
-  summarise(sd_meth = sd(methperc_mean, na.rm=T))
+#cpg_windows_min3_sd <- cpg_windows_min3 %>% group_by(window_total) %>% 
+#  summarise(sd_meth = sd(methperc_mean, na.rm=T))
 
-cpg_windows_min3_sum <- left_join(cpg_windows_min3_n, cpg_windows_min3_mean, by = "window_total") #leave out region for now, so wrong - talk to kees
-cpg_windows_min3_sum <- left_join(cpg_windows_min3_sum, cpg_windows_min3_sd, by = "window_total")
-cpg_windows_min3_sum$se_meth <- cpg_windows_min3_sum$sd_meth/sqrt(cpg_windows_min3_sum$n_meth)
-cpg_windows_min3_sum[cpg_windows_min3_sum == "NaN"] <- NA
+#cpg_windows_min3_sum <- left_join(cpg_windows_min3_n, cpg_windows_min3_mean, by = "window_total") #leave out region for now, so wrong - talk to kees
+#cpg_windows_min3_sum <- left_join(cpg_windows_min3_sum, cpg_windows_min3_sd, by = "window_total")
+#cpg_windows_min3_sum$se_meth <- cpg_windows_min3_sum$sd_meth/sqrt(cpg_windows_min3_sum$n_meth)
+#cpg_windows_min3_sum[cpg_windows_min3_sum == "NaN"] <- NA
 
 
 # plot 
@@ -225,6 +242,20 @@ cpg_windows_min3_sum[cpg_windows_min3_sum == "NaN"] <- NA
 
 clr_4 <- c(clrs[1], clrs[2], clrs[8], clrs[13])
 
+#devtools::install_github("BlakeRMills/MoMAColors")
+#pacman::p_load(prismatic, MoMAColors)
+#clr <- MoMAColors::moma.colors("Fritsch", 8) %>% color()
+
+source("../ms_")
+clr_4 <- c("#0F8D7BFF", "#928918FF", "#774CB3FF", "#436C97FF")
+theme_set(theme_classic() + theme(title = element_text(size=16),
+                                  plot.subtitle = element_text(size=14),
+                                  axis.title = element_text(size = 18, family = "Arial"),
+                                  axis.text = element_text(size = 16, family = "Arial"),
+                                  text=element_text(size=14, family = "Arial"),
+                                  axis.title.y = element_text(margin = margin(t = 0, r = 10, b = 0, l = 0),
+                                                              color = "black"),
+                                  plot.margin = margin(1,1,1,1, "cm")))
 
 mean_tss_meth <- mean(cpg_windows_min2$methperc_mean[which(cpg_windows_min2$region == "TSS")], na.rm=T)      
 
