@@ -3,6 +3,9 @@
 #### packages ####
 pacman::p_load(data.table, genomation, GenomicFeatures, rtracklayer, GenomicRanges, windowscanr, dplyr, ggplot2, cowplot, assertthat)
 
+source("/home/nioo/rebeccash/PhD_grouse/methylation_grouse/scripts/plotting_theme.R")
+
+
 #### load data ####
 meth <- fread("data/processed/methcall/methcall_report.CX_report.txt.gz")
 
@@ -219,24 +222,14 @@ cpg_windows_min3_sum[cpg_windows_min3_sum == "NaN"] <- NA
 
 # plot 
 # colours
-#devtools::install_github("BlakeRMills/MoMAColors")
-#pacman::p_load(prismatic, MoMAColors)
-#clr <- MoMAColors::moma.colors("Fritsch", 8) %>% color()
-#clr_4 <- clr[c(1,7,3,2)]
-clr_4 <- c("#0F8D7BFF", "#928918FF", "#774CB3FF", "#436C97FF")
-theme_set(theme_classic() + theme(title = element_text(size=16),
-                                  plot.subtitle = element_text(size=14),
-                                  axis.title = element_text(size = 18, family = "Arial"),
-                                  axis.text = element_text(size = 16, family = "Arial"),
-                                  text=element_text(size=14, family = "Arial"),
-                                  axis.title.y = element_text(margin = margin(t = 0, r = 10, b = 0, l = 0),
-                                                              color = "black"),
-                                  plot.margin = margin(1,1,1,1, "cm")))
+
+clr_4 <- c(clrs[1], clrs[2], clrs[8], clrs[13])
+
 
 mean_tss_meth <- mean(cpg_windows_min2$methperc_mean[which(cpg_windows_min2$region == "TSS")], na.rm=T)      
 
 ggplot(cpg_windows_min2_sum, aes(x = window_total, y = mean_meth)) + 
-  geom_ribbon(aes(ymin = mean_meth - se_meth, ymax =mean_meth + se_meth), fill = "lightblue", alpha = 0.7)+
+  geom_ribbon(aes(ymin = mean_meth - se_meth, ymax =mean_meth + se_meth), fill = clrs[3], alpha = 0.7)+
   geom_line(col = "black", linewidth = 0.8) +
   geom_point() + labs(y = "Mean CpG methylation %", title = "CpG methylation across gene regions")+
   geom_text(label="10 kb upstream", x = 20, y = 66, col = clr_4[1], family = "Arial", size = 6)+
@@ -257,7 +250,7 @@ ggplot(cpg_windows_min2_sum, aes(x = window_total, y = mean_meth)) +
 tss_min2 <- subset(cpg_windows_min2, region == "TSS")
 tss_min2$methperc_n <- as.numeric(tss_min2$methperc_n)
 
-ggplot(tss_min2, aes(x = methperc_mean)) + geom_histogram() +
+ggplot(tss_min2, aes(x = methperc_mean)) + geom_histogram(fill=) +
   labs(x = "Mean CpG methylation %", title = "Histogram TSS CpG methylation % ", subtitle = "(min sites = 2)", y = "Count") -> tss_hist_min2
 
 ggplot(tss_min2, aes(x = methperc_n, y = methperc_mean)) + geom_point() +
@@ -269,6 +262,12 @@ cowplot::plot_grid(tss_hist_min2, tss_n_vs_meth_min2, ncol = 2, align = "hv", ax
 cowplot::plot_grid(tss_a_min2, across_genes_min2, ncol = 1, align = "h", axis = "l") -> tss_sum_min2
 
 ggsave(tss_sum_min2, file = "plots/summary_wgbs_TSS_min2.png", width=16, height=16)
+
+### or just the histogram and across the genes
+
+cowplot::plot_grid(tss_hist_min2, across_genes_min2, ncol = 1, align = "h", axis = "l") -> hist_across_min2
+
+ggsave(hist_across_min2, file = "plots/summary_wgbs_TSS_min2_hist_across.png", width=16, height=16)
 
 ## min 3
 
