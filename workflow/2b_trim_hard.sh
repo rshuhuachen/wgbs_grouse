@@ -11,4 +11,4 @@
 
 cd /vol/cluster-data/rchen/wgbs
 
-trim_galore --paired data/E197_R1.fq.gz data/E197_R2.fq.gz --quality 20 --fastqc --clip_R1 3 --clip_R2 3 --gzip --cores 8 -o ./data/processed/hardtrim/ 2>&1 | tee log/trim.log
+trim_galore --paired data/E197_R1.fq.gz data/E197_R2.fq.gz --quality 20 --fastqc --clip_R1 3 --clip_R2 3 --three_prime_clip_R1 1 --three_prime_clip_R2 1 --gzip --cores 8 -o ./data/processed/hardtrim/ 2>&1 | tee log/trim.log

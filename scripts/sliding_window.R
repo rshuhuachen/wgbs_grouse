@@ -191,6 +191,8 @@ cpg_windows_min2$win_nr <- as.numeric(cpg_windows_min2$win_nr)
 cpg_windows_min2$methperc_mean <- as.numeric(cpg_windows_min2$methperc_mean)
 cpg_windows_min2 <- left_join(cpg_windows_min2, total_window, by = c("win_nr", "region"))
 cpg_windows_min2 <- subset(cpg_windows_min2, !is.na(window_total))
+
+save(cpg_windows_min2, file="output/cpg_meth_min2.RData")
 #summarise
 
 cpg_windows_min2_n <- cpg_windows_min2 %>% group_by(window_total) %>% 
